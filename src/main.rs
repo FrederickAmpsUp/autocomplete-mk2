@@ -16,7 +16,7 @@ fn train_on_text(tree: &mut tree::Tree, text: &str, max_len: usize) {
 
 fn main() {
     let mut tree = tree::Tree::new();
-    let text = std::fs::read_to_string("2600-0.txt").unwrap();
+    let text = std::fs::read_to_string("bee-movie-script.txt").unwrap().replace("\n", " ");
     train_on_text(&mut tree, &text, 12);
 
     ui::run_ui(&tree).unwrap();

@@ -1,15 +1,13 @@
 use std::io::{self, Write};
 use crossterm::{
-    cursor,
     event::{self, Event, KeyCode},
     style::Print,
     terminal::{self, ClearType},
-    ExecutableCommand,
+    style::{SetForegroundColor, Color}
 };
-use crossterm::style::{SetAttribute, Attribute, ResetColor, SetForegroundColor, Color};
 
 pub fn run_ui(tree: &crate::tree::Tree) -> anyhow::Result<()> {
-    use crossterm::{queue, style::ResetColor, cursor::MoveToColumn};
+    use crossterm::{queue, cursor::MoveToColumn};
 
     let mut stdout = io::stdout();
     terminal::enable_raw_mode()?;
@@ -34,12 +32,16 @@ pub fn run_ui(tree: &crate::tree::Tree) -> anyhow::Result<()> {
         let mut suggestion = String::new();
 
         let mut suffixes = vec![];
-        for ctx_len in 2..8 {
+        for ctx_len in last_word.len().max(4)..8 {
             for s in tree.query_suffixes(&buffer[buffer.len()-ctx_len.min(buffer.len())..]) {
                 suffixes.push(s);
             }
         }
         suffixes.sort_by_key(|&(_, freq)| std::cmp::Reverse(freq));
+        suffixes.retain(|(s, _)| {
+            let trimmed = s.trim();
+            !trimmed.is_empty()
+        });
 
         // top suggestion inline
         if let Some((top, _freq)) = suffixes.get(0) {
@@ -52,13 +54,13 @@ pub fn run_ui(tree: &crate::tree::Tree) -> anyhow::Result<()> {
                 stdout,
                 SetForegroundColor(Color::Grey),
                 Print(sugg),
+                crossterm::cursor::MoveLeft(sugg.len() as u16),
                 SetForegroundColor(Color::White)
             )?;
             suggestion = sugg.to_string();
         }
 
-        // suggestions 2 and 3 on lines below
-        for (i, (suf, freq)) in suffixes.iter().skip(1).take(4).enumerate() {
+        for (i, (suf, _freq)) in suffixes.iter().skip(1).take(4).enumerate() {
             queue!(
                 stdout,
                 crossterm::cursor::MoveDown((i + 1) as u16),
@@ -77,7 +79,7 @@ pub fn run_ui(tree: &crate::tree::Tree) -> anyhow::Result<()> {
                     KeyCode::Char(c) => buffer.push(c),
                     KeyCode::Backspace => { buffer.pop(); }
                     KeyCode::Enter => { buffer.clear(); }
-                    KeyCode::Tab => { buffer.push_str(&suggestion); }
+                    KeyCode::Tab => { buffer.push_str(&suggestion); buffer.push(' '); }
                     KeyCode::Esc => break,
                     _ => {}
                 }
